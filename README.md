@@ -13,7 +13,7 @@ This repo is configured to build Flutter Web and deploy to Firebase Hosting on:
 1. Create or use an existing Firebase project in the Firebase console.
 2. In this GitHub repository, add the following:
    - Repository secret `FIREBASE_SERVICE_ACCOUNT`: contents of a Firebase Service Account JSON with Hosting Admin permissions (Project → IAM → Service Accounts → Create Key).
-   - Repository variable `FIREBASE_PROJECT_ID`: your Firebase Project ID (e.g., `my-project`).
+   - The workflow is already configured with `projectId: clevertournament`, so no repository variable is required.
 
 Tip: You can scope secrets/variables at the organization level if preferred.
 
