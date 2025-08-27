@@ -8,6 +8,7 @@ class Tournament {
     required this.location,
     required this.startDate,
     required this.endDate,
+    this.createdBy,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class Tournament {
   final String location;
   final DateTime startDate;
   final DateTime endDate;
+  final String? createdBy;
 
   factory Tournament.fromMap(Map<String, dynamic> m) {
     final sportStr = (m['sport'] as String).toLowerCase();
@@ -26,6 +28,7 @@ class Tournament {
       location: (m['location'] ?? '') as String,
       startDate: DateTime.parse(m['start_date'] as String),
       endDate: DateTime.parse(m['end_date'] as String),
+      createdBy: m['created_by'] as String?,
     );
   }
 
@@ -36,5 +39,6 @@ class Tournament {
         'location': location,
         'start_date': startDate.toIso8601String(),
         'end_date': endDate.toIso8601String(),
+        'created_by': createdBy,
       };
 }

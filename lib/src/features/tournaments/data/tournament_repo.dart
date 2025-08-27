@@ -4,6 +4,7 @@ import '../models/pool_model.dart';
 import '../models/team_model.dart';
 import '../models/game_model.dart';
 import '../models/player_model.dart';
+import '../models/announcement_model.dart';
 
 class TournamentRepo {
   TournamentRepo(this._client);
@@ -43,9 +44,11 @@ class TournamentRepo {
   }
 
   Future<List<Team>> fetchTeams(String tournamentId, {String? poolId}) async {
-    var query = _client.from('teams').select().eq('tournament_id', tournamentId).order('seed', ascending: true);
-    if (poolId != null) query = query.eq('pool_id', poolId);
-    final res = await query;
+    var query = _client.from('teams').select().eq('tournament_id', tournamentId);
+    if (poolId != null) {
+      query = query.eq('pool_id', poolId);
+    }
+    final res = await query.order('seed', ascending: true);
     return (res as List).cast<Map<String, dynamic>>().map(Team.fromMap).toList();
   }
 
@@ -75,9 +78,11 @@ class TournamentRepo {
   }
 
   Future<List<GameModel>> fetchGames(String tournamentId, {String? poolId}) async {
-    var q = _client.from('games').select().eq('tournament_id', tournamentId).order('start_time', ascending: true);
-    if (poolId != null) q = q.eq('pool_id', poolId);
-    final res = await q;
+    var q = _client.from('games').select().eq('tournament_id', tournamentId);
+    if (poolId != null) {
+      q = q.eq('pool_id', poolId);
+    }
+    final res = await q.order('start_time', ascending: true);
     return (res as List).cast<Map<String, dynamic>>().map(GameModel.fromMap).toList();
   }
 
@@ -104,6 +109,34 @@ class TournamentRepo {
     if (startTime != null) payload['start_time'] = startTime.toIso8601String();
     if (payload.isEmpty) return;
     await _client.from('games').update(payload).eq('id', gameId);
+  }
+
+  // Announcements
+  Future<List<Announcement>> fetchAnnouncements(String tournamentId) async {
+    final res = await _client
+        .from('announcements')
+        .select()
+        .eq('tournament_id', tournamentId)
+        .order('inserted_at', ascending: false);
+    return (res as List).cast<Map<String, dynamic>>().map(Announcement.fromMap).toList();
+  }
+
+  Future<Announcement> addAnnouncement(String tournamentId, String content, {String target = 'all'}) async {
+    final res = await _client
+        .from('announcements')
+        .insert({'tournament_id': tournamentId, 'content': content, 'target': target, 'created_by': _client.auth.currentUser?.id})
+        .select()
+        .single();
+    return Announcement.fromMap((res as Map<String, dynamic>));
+  }
+
+  Stream<List<Announcement>> streamAnnouncements(String tournamentId) {
+    return _client
+        .from('announcements')
+        .stream(primaryKey: ['id'])
+        .eq('tournament_id', tournamentId)
+        .order('inserted_at')
+        .map((rows) => rows.map((e) => Announcement.fromMap(e)).toList().reversed.toList());
   }
 
   // Settings

@@ -139,8 +139,104 @@ class _OverviewTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        const _PlaceholderCard(text: 'Announcements will appear here'),
+        _AnnouncementsPanel(tournament: t),
       ],
+    );
+  }
+}
+
+class _AnnouncementsPanel extends StatefulWidget {
+  const _AnnouncementsPanel({required this.tournament});
+  final Tournament tournament;
+  @override
+  State<_AnnouncementsPanel> createState() => _AnnouncementsPanelState();
+}
+
+class _AnnouncementsPanelState extends State<_AnnouncementsPanel> {
+  late final TournamentRepo repo;
+  final _controller = TextEditingController();
+  String target = 'all';
+  @override
+  void initState() {
+    super.initState();
+    repo = TournamentRepo(Supabase.instance.client);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get isOwner => widget.tournament.createdBy == Supabase.instance.client.auth.currentUser?.id;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (isOwner) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: const InputDecoration(labelText: 'Compose announcement'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: target,
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All')),
+                    ],
+                    onChanged: (v) => setState(() => target = v ?? 'all'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () async {
+                      final text = _controller.text.trim();
+                      if (text.isEmpty) return;
+                      await repo.addAnnouncement(widget.tournament.id, text, target: target);
+                      _controller.clear();
+                    },
+                    child: const Text('Send'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              height: 200,
+              child: StreamBuilder(
+                stream: repo.streamAnnouncements(widget.tournament.id),
+                builder: (context, snapshot) {
+                  final items = snapshot.data ?? const [];
+                  if (items.isEmpty) {
+                    return const Center(child: Text('No announcements yet'));
+                  }
+                  return ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (ctx, i) {
+                      final a = items[i];
+                      return ListTile(
+                        leading: const Icon(Icons.campaign_outlined),
+                        title: Text(a.content),
+                        subtitle: Text('${a.target} • ${a.insertedAt}'),
+                      );
+                    },
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
     );
   }
 }

@@ -13,13 +13,14 @@ class CleverTournamentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = AppTheme.buildTheme(Brightness.light);
     final darkTheme = AppTheme.buildTheme(Brightness.dark);
+    final session = SupabaseService.client.auth.currentSession;
 
     return MaterialApp(
       title: 'CleverTournament',
       theme: theme,
       darkTheme: darkTheme,
       themeMode: ThemeMode.system,
-      initialRoute: '/login',
+      initialRoute: session != null ? '/home' : '/login',
       routes: {
         '/login': (_) => const LoginPage(),
         '/register': (_) => const RegisterPage(),

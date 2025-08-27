@@ -19,6 +19,9 @@ class _TournamentsPageState extends State<TournamentsPage> {
   void initState() {
     super.initState();
     _load();
+    Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -42,9 +45,19 @@ class _TournamentsPageState extends State<TournamentsPage> {
     if (created != null) {
       // Persist to Supabase
       try {
+        final userId = Supabase.instance.client.auth.currentUser?.id;
+        if (userId == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please sign in to create a tournament.')),
+            );
+          }
+          return;
+        }
+
         final map = created.toMap();
         map.remove('id');
-        map['created_by'] = Supabase.instance.client.auth.currentUser?.id;
+        map['created_by'] = userId; // also set by DB trigger if omitted
         // Ensure date-only strings for date columns
         map['start_date'] = created.startDate.toIso8601String().substring(0, 10);
         map['end_date'] = created.endDate.toIso8601String().substring(0, 10);
@@ -78,6 +91,18 @@ class _TournamentsPageState extends State<TournamentsPage> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          if (Supabase.instance.client.auth.currentUser == null)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('You are not signed in'),
+                subtitle: const Text('Sign in to create and manage tournaments.'),
+                trailing: FilledButton(
+                  onPressed: () => Navigator.of(context).pushNamed('/login'),
+                  child: const Text('Sign in'),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Text('Browse tournaments',
@@ -91,7 +116,11 @@ class _TournamentsPageState extends State<TournamentsPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _create,
+        onPressed: Supabase.instance.client.auth.currentUser == null
+            ? () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please sign in first')),
+                )
+            : _create,
         icon: const Icon(Icons.add),
         label: const Text('New tournament'),
       ),

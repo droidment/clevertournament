@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:clevertournament/src/features/tournaments/tournaments_page.dart';
 
 class HomeShell extends StatefulWidget {
@@ -23,6 +24,19 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('CleverTournament'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              try {
+                await Supabase.instance.client.auth.signOut();
+              } catch (_) {}
+              if (!mounted) return;
+              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+            },
+          ),
+        ],
       ),
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
