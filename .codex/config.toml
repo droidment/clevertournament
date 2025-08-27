@@ -2,3 +2,10 @@
 ask_for_approval = "never"
 sandbox = "danger-full-access"
 
+[mcp_servers.supabase_sql]
+command = "node"
+args = [".codex/tools/supabase-sql/server.mjs"]
+env = { SUPABASE_PROJECT = "qqmsiddtjjmyqfndqywe", SUPABASE_PAT = "sbp_93201549fa1f8b8fc8efd9b7fc75961848c40dfa" }
+
+NEXT_PUBLIC_SUPABASE_URL=https://qqmsiddtjjmyqfndqywe.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbXNpZGR0ampteXFmbmRxeXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyOTk0OTEsImV4cCI6MjA3MTg3NTQ5MX0.qnm2D4OmvmwEvKlSq4DmPnhtpyMmpgiKeEC2VyTuj60
