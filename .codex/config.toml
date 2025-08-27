@@ -1,0 +1,4 @@
+[cli]
+ask_for_approval = "never"
+sandbox = "danger-full-access"
+
