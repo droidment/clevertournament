@@ -2,6 +2,42 @@
 
 A new Flutter project.
 
+## Supabase Integration
+
+- Backend: Supabase (auth + tables with RLS)
+- Client: `supabase_flutter` initialized at app start
+- SQL tool: MCP server for executing SQL via Supabase Management API
+
+### Run the app (with dart-define)
+
+- Install deps: `flutter pub get`
+- Run:
+  - `flutter run --dart-define=SUPABASE_URL=https://qqmsiddtjjmyqfndqywe.supabase.co --dart-define=SUPABASE_ANON_KEY=<YOUR_ANON_KEY>`
+- Defaults exist in code, but using dart-define is recommended for prod.
+
+### Features wired to Supabase
+
+- Auth: Register, Sign-in (email+password)
+- Tournaments: List, Create (sends `created_by`, date-only `start_date`/`end_date`)
+- Pools & Teams: Create pools, add teams, assign pool, drag-and-drop seeding (persists `seed`)
+- Games: Round-robin generator per pool, list and enter scores
+- Standings: Calculated per pool from games (2 pts per win)
+
+### Database schema
+
+- Tables: `tournaments`, `pools`, `teams`, `games`
+- RLS: Public read; owner-only write (`created_by = auth.uid()`)
+- Migration reference: `supabase/migrations/0001_init.sql`
+
+Apply via Supabase Studio → SQL (paste contents), or use the SQL API/MCP tool below.
+
+### MCP SQL tool (optional)
+
+- Location: `.codex/tools/supabase-sql`
+- Install once: `cd .codex/tools/supabase-sql && npm install`
+- Configured in `.codex/config.toml` to call Supabase Management API at `.../v1/projects/<ref>/database/query`
+- Use from the Codex CLI UI by invoking tool `supabase_sql.exec_sql` with a `query` string.
+
 ## Deployment (Firebase Hosting via GitHub Actions)
 
 This repo is configured to build Flutter Web and deploy to Firebase Hosting on:
