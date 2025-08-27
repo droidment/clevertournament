@@ -5,6 +5,7 @@ import '../models/team_model.dart';
 import '../models/game_model.dart';
 import '../models/player_model.dart';
 import '../models/announcement_model.dart';
+import '../models/team_registration_model.dart';
 
 class TournamentRepo {
   TournamentRepo(this._client);
@@ -93,6 +94,103 @@ class TournamentRepo {
 
   Future<void> deleteTeam(String teamId) async {
     await _client.from('teams').delete().eq('id', teamId);
+  }
+
+  Future<String> regenerateJoinCode(String teamId) async {
+    final code = await _genJoinCode();
+    final res = await _client
+        .from('teams')
+        .update({'join_code': code})
+        .eq('id', teamId)
+        .select('join_code')
+        .single();
+    return (res['join_code'] as String);
+  }
+
+  Future<String> joinTeam({
+    required String code,
+    required String name,
+    int? number,
+    String? email,
+  }) async {
+    final res = await _client.rpc('join_team', params: {
+      'p_code': code,
+      'p_name': name,
+      'p_number': number,
+      'p_email': email,
+    });
+    return (res as String);
+  }
+
+  // Team registrations
+  Future<TeamRegistration> submitRegistration({
+    required String tournamentId,
+    required String teamName,
+    String? captainName,
+    String? captainEmail,
+    String? captainPhone,
+    String? notes,
+  }) async {
+    final res = await _client
+        .from('team_registrations')
+        .insert({
+          'tournament_id': tournamentId,
+          'team_name': teamName,
+          'captain_name': captainName,
+          'captain_email': captainEmail,
+          'captain_phone': captainPhone,
+          'notes': notes,
+          'created_by': _client.auth.currentUser?.id,
+        })
+        .select()
+        .single();
+    return TeamRegistration.fromMap((res as Map<String, dynamic>));
+  }
+
+  Future<List<TeamRegistration>> fetchRegistrations(String tournamentId) async {
+    final res = await _client
+        .from('team_registrations')
+        .select()
+        .eq('tournament_id', tournamentId)
+        .order('inserted_at', ascending: false);
+    return (res as List).cast<Map<String, dynamic>>().map(TeamRegistration.fromMap).toList();
+  }
+
+  Future<void> updateRegistrationStatus(String regId, String status, {String? teamId}) async {
+    await _client.from('team_registrations').update({'status': status, 'team_id': teamId}).eq('id', regId);
+  }
+
+  Future<String> _genJoinCode() async {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    String code() {
+      final r = _client.auth.currentSession?.accessToken.hashCode ?? DateTime.now().millisecondsSinceEpoch;
+      var s = '';
+      for (var i = 0; i < 6; i++) {
+        final idx = (r + i * 37) % chars.length;
+        s += chars[idx];
+      }
+      return s;
+    }
+    return code();
+  }
+
+  Future<Team> approveRegistration(TeamRegistration reg) async {
+    final joinCode = await _genJoinCode();
+    final inserted = await _client
+        .from('teams')
+        .insert({
+          'tournament_id': reg.tournamentId,
+          'name': reg.teamName,
+          'captain_name': reg.captainName,
+          'captain_email': reg.captainEmail,
+          'captain_phone': reg.captainPhone,
+          'join_code': joinCode,
+        })
+        .select()
+        .single();
+    final team = Team.fromMap((inserted as Map<String, dynamic>));
+    await updateRegistrationStatus(reg.id, 'approved', teamId: team.id);
+    return team;
   }
 
   Future<void> setSeeds(List<Team> teams) async {

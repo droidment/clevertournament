@@ -1,53 +1,52 @@
-class Team {
-  Team({
+class TeamRegistration {
+  TeamRegistration({
     required this.id,
     required this.tournamentId,
-    required this.name,
-    this.poolId,
-    this.seed = 0,
+    required this.teamName,
     this.captainName,
     this.captainEmail,
     this.captainPhone,
-    this.jerseyColor,
-    this.joinCode,
+    this.notes,
+    this.status = 'pending',
+    this.createdBy,
+    this.teamId,
   });
 
   final String id;
   final String tournamentId;
-  final String name;
-  final String? poolId;
-  final int seed;
+  final String teamName;
   final String? captainName;
   final String? captainEmail;
   final String? captainPhone;
-  final String? jerseyColor;
-  final String? joinCode;
+  final String? notes;
+  final String status;
+  final String? createdBy;
+  final String? teamId;
 
-  factory Team.fromMap(Map<String, dynamic> m) => Team(
+  factory TeamRegistration.fromMap(Map<String, dynamic> m) => TeamRegistration(
         id: m['id'] as String,
         tournamentId: m['tournament_id'] as String,
-        name: m['name'] as String,
-        poolId: m['pool_id'] as String?,
-        seed: (m['seed'] ?? 0) is int
-            ? (m['seed'] as int)
-            : ((m['seed'] as num?)?.toInt() ?? 0),
+        teamName: m['team_name'] as String,
         captainName: m['captain_name'] as String?,
         captainEmail: m['captain_email'] as String?,
         captainPhone: m['captain_phone'] as String?,
-        jerseyColor: m['jersey_color'] as String?,
-        joinCode: m['join_code'] as String?,
+        notes: m['notes'] as String?,
+        status: m['status'] as String,
+        createdBy: m['created_by'] as String?,
+        teamId: m['team_id'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'tournament_id': tournamentId,
-        'name': name,
-        'pool_id': poolId,
-        'seed': seed,
+        'team_name': teamName,
         'captain_name': captainName,
         'captain_email': captainEmail,
         'captain_phone': captainPhone,
-        'jersey_color': jerseyColor,
-        'join_code': joinCode,
+        'notes': notes,
+        'status': status,
+        'created_by': createdBy,
+        'team_id': teamId,
       };
 }
+

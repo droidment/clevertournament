@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 
 import 'data/tournament_repo.dart';
 import 'models/team_model.dart';
@@ -16,6 +17,7 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
   late final TournamentRepo repo;
   List<Player> players = [];
   bool loading = true;
+  String? joinCode;
 
   @override
   void initState() {
@@ -27,7 +29,7 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
   Future<void> _load() async {
     setState(() => loading = true);
     final ps = await repo.fetchPlayers(widget.team.id);
-    setState(() { players = ps; loading = false; });
+    setState(() { players = ps; joinCode = widget.team.joinCode; loading = false; });
   }
 
   Future<void> _add() async {
@@ -149,7 +151,29 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.team.name} roster')),
+      appBar: AppBar(
+        title: Text('${widget.team.name} roster'),
+        actions: [
+          if (joinCode != null) IconButton(
+            tooltip: 'Copy join code',
+            icon: const Icon(Icons.copy_all_outlined),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: joinCode));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Join code copied')));
+            },
+          ),
+          IconButton(
+            tooltip: 'Regenerate join code',
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              final code = await repo.regenerateJoinCode(widget.team.id);
+              setState(() => joinCode = code);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Join code updated')));
+            },
+          )
+        ],
+      ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(

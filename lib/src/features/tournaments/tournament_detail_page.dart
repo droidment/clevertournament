@@ -8,6 +8,9 @@ import 'models/game_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tournament_settings_page.dart';
 import 'team_roster_page.dart';
+import 'team_registration_page.dart';
+import 'approvals_page.dart';
+import 'join_team_page.dart';
 
 class TournamentDetailPage extends StatefulWidget {
   const TournamentDetailPage({super.key, required this.tournament});
@@ -101,6 +104,18 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => TeamRegistrationPage(tournament: t),
+                  ));
+                },
+                icon: const Icon(Icons.group_add_outlined),
+                label: const Text('Register team'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
                 onPressed: () async {
                   final repo = TournamentRepo(Supabase.instance.client);
                   final teams = await repo.fetchTeams(t.id);
@@ -136,6 +151,35 @@ class _OverviewTab extends StatelessWidget {
                 label: const Text('Rosters'),
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const JoinTeamPage()),
+                  );
+                },
+                icon: const Icon(Icons.vpn_key_outlined),
+                label: const Text('Join with code'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (t.createdBy == Supabase.instance.client.auth.currentUser?.id)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ApprovalsPage(tournament: t)),
+                    );
+                  },
+                  icon: const Icon(Icons.inbox_outlined),
+                  label: const Text('Review registrations'),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 8),
