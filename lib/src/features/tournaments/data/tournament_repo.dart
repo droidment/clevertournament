@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/pool_model.dart';
 import '../models/team_model.dart';
 import '../models/game_model.dart';
+import '../models/player_model.dart';
 
 class TournamentRepo {
   TournamentRepo(this._client);
@@ -96,5 +97,41 @@ class TournamentRepo {
   Future<void> updateScore(String gameId, {required int a, required int b, String status = 'final'}) async {
     await _client.from('games').update({'score_a': a, 'score_b': b, 'status': status}).eq('id', gameId);
   }
-}
 
+  Future<void> updateGame(String gameId, {String? court, DateTime? startTime}) async {
+    final payload = <String, dynamic>{};
+    if (court != null) payload['court'] = court;
+    if (startTime != null) payload['start_time'] = startTime.toIso8601String();
+    if (payload.isEmpty) return;
+    await _client.from('games').update(payload).eq('id', gameId);
+  }
+
+  // Settings
+  Future<Map<String, dynamic>> fetchSettings(String tournamentId) async {
+    final res = await _client.from('tournaments').select('settings').eq('id', tournamentId).single();
+    return (res['settings'] as Map<String, dynamic>? ?? {});
+  }
+
+  Future<void> saveSettings(String tournamentId, Map<String, dynamic> settings) async {
+    await _client.from('tournaments').update({'settings': settings}).eq('id', tournamentId);
+  }
+
+  // Players
+  Future<List<Player>> fetchPlayers(String teamId) async {
+    final res = await _client.from('players').select().eq('team_id', teamId).order('inserted_at');
+    return (res as List).cast<Map<String, dynamic>>().map(Player.fromMap).toList();
+  }
+
+  Future<Player> addPlayer(String teamId, {required String name, int? number, String? email}) async {
+    final res = await _client
+        .from('players')
+        .insert({'team_id': teamId, 'name': name, 'number': number, 'email': email})
+        .select()
+        .single();
+    return Player.fromMap((res as Map<String, dynamic>));
+  }
+
+  Future<void> removePlayer(String playerId) async {
+    await _client.from('players').delete().eq('id', playerId);
+  }
+}

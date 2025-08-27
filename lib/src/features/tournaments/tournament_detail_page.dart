@@ -6,6 +6,8 @@ import 'models/pool_model.dart';
 import 'models/team_model.dart';
 import 'models/game_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'tournament_settings_page.dart';
+import 'team_roster_page.dart';
 
 class TournamentDetailPage extends StatefulWidget {
   const TournamentDetailPage({super.key, required this.tournament});
@@ -81,6 +83,60 @@ class _OverviewTab extends StatelessWidget {
               label: Text(t.sport == Sport.volleyball ? 'Volleyball' : 'Pickleball'),
             ),
           ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => TournamentSettingsPage(tournament: t),
+                  ));
+                },
+                icon: const Icon(Icons.settings),
+                label: const Text('Settings'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final repo = TournamentRepo(Supabase.instance.client);
+                  final teams = await repo.fetchTeams(t.id);
+                  if (!context.mounted) return;
+                  if (teams.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No teams yet. Add teams in Pools tab.')),
+                    );
+                    return;
+                  }
+                  showModalBottomSheet(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (ctx) => ListView(
+                      children: [
+                        const ListTile(title: Text('Select a team')), 
+                        for (final team in teams)
+                          ListTile(
+                            title: Text(team.name),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => TeamRosterPage(team: team)),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.groups_2_outlined),
+                label: const Text('Rosters'),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         const _PlaceholderCard(text: 'Announcements will appear here'),
@@ -476,6 +532,66 @@ class _ScheduleTabState extends State<_ScheduleTab> {
     }
   }
 
+  Future<void> _editGame(GameModel g) async {
+    final repo = this.repo;
+    final settings = await repo.fetchSettings(widget.tournament.id);
+    final courts = (settings['courts'] as List?)?.cast<String>() ?? <String>[];
+    String? selectedCourt = g.court;
+    DateTime? selectedTime = g.startTime ?? DateTime.now();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit game'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              value: selectedCourt,
+              items: [
+                for (final c in courts)
+                  DropdownMenuItem(value: c, child: Text(c)),
+              ],
+              onChanged: (v) => selectedCourt = v,
+              decoration: const InputDecoration(labelText: 'Court'),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule_outlined),
+              title: const Text('Start time'),
+              subtitle: Text(selectedTime.toString()),
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: ctx,
+                  initialDate: selectedTime ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (d == null) return;
+                final t = await showTimePicker(
+                  context: ctx,
+                  initialTime: TimeOfDay.fromDateTime(selectedTime ?? DateTime.now()),
+                );
+                if (t == null) return;
+                selectedTime = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+                (ctx as Element).markNeedsBuild();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await repo.updateGame(g.id, court: selectedCourt, startTime: selectedTime);
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) return const _PlaceholderCenter('Loading...');
@@ -493,8 +609,14 @@ class _ScheduleTabState extends State<_ScheduleTab> {
           child: ListTile(
             title: Text(title),
             subtitle: Text(sub),
-            trailing: Text('${g.scoreA} - ${g.scoreB}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${g.scoreA} - ${g.scoreB}')
+              ],
+            ),
             onTap: () => _enterScore(g),
+            onLongPress: () => _editGame(g),
           ),
         );
       },
