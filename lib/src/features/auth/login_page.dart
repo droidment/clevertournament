@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:clevertournament/src/core/config/env.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,9 +15,11 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _busy = false;
+  late final AuthSubscription _authSub;
 
   @override
   void dispose() {
+    _authSub.unsubscribe();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
@@ -42,6 +45,37 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Sign in failed')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (!mounted) return;
+      if (event.session != null) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    });
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        Provider.google,
+        redirectTo: Env.supabaseRedirectUrl,
+        queryParams: {'prompt': 'select_account'},
+      );
+      // On web, this will redirect and return with a session; listener above handles nav.
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in failed')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -101,17 +135,23 @@ class _LoginPageState extends State<LoginPage> {
                           : const Text('Sign in'),
                     ),
                     const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: _busy
-                          ? null
-                          : () => Navigator.of(context).pushNamed('/register'),
-                      child: const Text('Create account'),
-                    ),
-                  ],
-                ),
+                  OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.of(context).pushNamed('/register'),
+                    child: const Text('Create account'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _loginWithGoogle,
+                    icon: const Icon(Icons.login),
+                    label: const Text('Continue with Google'),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
         ),
       ),
     );

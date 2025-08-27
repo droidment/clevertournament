@@ -9,4 +9,10 @@ class Env {
     defaultValue:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbXNpZGR0ampteXFmbmRxeXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyOTk0OTEsImV4cCI6MjA3MTg3NTQ5MX0.qnm2D4OmvmwEvKlSq4DmPnhtpyMmpgiKeEC2VyTuj60',
   );
+
+  // Used for OAuth redirect on web; override in prod.
+  static const supabaseRedirectUrl = String.fromEnvironment(
+    'SUPABASE_REDIRECT_URL',
+    defaultValue: 'http://localhost:3000/',
+  );
 }
