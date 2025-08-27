@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:clevertournament/src/features/profile/profile_page.dart';
 import 'package:clevertournament/src/features/tournaments/tournaments_page.dart';
 
 class HomeShell extends StatefulWidget {
@@ -25,6 +26,13 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: const Text('CleverTournament'),
         actions: [
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.account_circle_outlined),
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
+            },
+          ),
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),

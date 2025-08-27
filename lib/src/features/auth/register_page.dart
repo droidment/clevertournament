@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:clevertournament/src/core/config/env.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -15,12 +16,14 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordCtrl = TextEditingController();
   bool _busy = false;
   bool _obscure = true;
+  late final AuthSubscription _authSub;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _authSub.unsubscribe();
     super.dispose();
   }
 
@@ -45,6 +48,36 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Registration failed')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (!mounted) return;
+      if (event.session != null) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    });
+  }
+
+  Future<void> _registerWithGoogle() async {
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        Provider.google,
+        redirectTo: Env.supabaseRedirectUrl,
+        queryParams: {'prompt': 'select_account'},
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in failed')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -104,21 +137,27 @@ class _RegisterPageState extends State<RegisterPage> {
                           : null,
                     ),
                     const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _busy ? null : _register,
-                      child: _busy
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Create account'),
-                    ),
-                  ],
-                ),
+                  FilledButton(
+                    onPressed: _busy ? null : _register,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create account'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _registerWithGoogle,
+                    icon: const Icon(Icons.login),
+                    label: const Text('Continue with Google'),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
         ),
       ),
     );
