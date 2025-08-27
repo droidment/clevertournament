@@ -4,7 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/tournament_repo.dart';
 
 class JoinTeamPage extends StatefulWidget {
-  const JoinTeamPage({super.key});
+  const JoinTeamPage({super.key, this.initialCode});
+  final String? initialCode;
   @override
   State<JoinTeamPage> createState() => _JoinTeamPageState();
 }
@@ -24,6 +25,14 @@ class _JoinTeamPageState extends State<JoinTeamPage> {
     _numCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
+  }
+  
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCode != null && widget.initialCode!.isNotEmpty) {
+      _codeCtrl.text = widget.initialCode!;
+    }
   }
 
   Future<void> _join() async {
@@ -102,4 +111,3 @@ class _JoinTeamPageState extends State<JoinTeamPage> {
     );
   }
 }
-

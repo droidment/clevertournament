@@ -162,6 +162,20 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Join code copied')));
             },
           ),
+          if (joinCode != null) IconButton(
+            tooltip: 'Copy share link',
+            icon: const Icon(Icons.link_outlined),
+            onPressed: () {
+              final base = Uri.base;
+              String origin = '';
+              if (base.hasScheme && (base.scheme == 'http' || base.scheme == 'https') && base.hasAuthority) {
+                origin = '${base.scheme}://${base.authority}';
+              }
+              final link = origin.isNotEmpty ? '$origin/#/join?code=$joinCode' : '/#/join?code=$joinCode';
+              Clipboard.setData(ClipboardData(text: link));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Join link copied')));
+            },
+          ),
           IconButton(
             tooltip: 'Regenerate join code',
             icon: const Icon(Icons.refresh),

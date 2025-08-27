@@ -5,6 +5,7 @@ import 'package:clevertournament/src/core/supabase/supabase_service.dart';
 import 'package:clevertournament/src/features/auth/login_page.dart';
 import 'package:clevertournament/src/features/auth/register_page.dart';
 import 'package:clevertournament/src/features/home/home_shell.dart';
+import 'package:clevertournament/src/features/tournaments/join_team_page.dart';
 
 class CleverTournamentApp extends StatelessWidget {
   const CleverTournamentApp({super.key});
@@ -25,6 +26,17 @@ class CleverTournamentApp extends StatelessWidget {
         '/login': (_) => const LoginPage(),
         '/register': (_) => const RegisterPage(),
         '/home': (_) => const HomeShell(),
+      },
+      onGenerateRoute: (settings) {
+        final name = settings.name ?? '';
+        try {
+          final uri = Uri.parse(name);
+          if (uri.path == '/join') {
+            final code = uri.queryParameters['code'];
+            return MaterialPageRoute(builder: (_) => JoinTeamPage(initialCode: code));
+          }
+        } catch (_) {}
+        return null;
       },
     );
   }
