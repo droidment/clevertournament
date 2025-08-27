@@ -729,65 +729,23 @@ class _StandingsTab extends StatefulWidget {
 class _StandingsTabState extends State<_StandingsTab> {
   late final TournamentRepo repo;
   bool loading = true;
-  Map<String, List<_StandingRow>> standingsByPool = {};
-  Map<String, String> poolNames = {};
+  List<Pool> pools = [];
+  List<Team> teams = [];
 
   @override
   void initState() {
     super.initState();
     repo = TournamentRepo(Supabase.instance.client);
-    _load();
+    _loadPoolsAndTeams();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadPoolsAndTeams() async {
     setState(() => loading = true);
-    final pools = await repo.fetchPools(widget.tournament.id);
-    final teams = await repo.fetchTeams(widget.tournament.id);
-    final games = await repo.fetchGames(widget.tournament.id);
-
-    final teamById = {for (final t in teams) t.id: t};
-    final map = <String, _Agg>{};
-    for (final g in games) {
-      final a = g.teamA;
-      final b = g.teamB;
-      if (a == null || b == null) continue;
-      final pa = teamById[a]?.poolId;
-      final pb = teamById[b]?.poolId;
-      if (pa == null || pb == null || pa != pb) continue;
-      map.putIfAbsent(a, () => _Agg()).played++;
-      map.putIfAbsent(b, () => _Agg()).played++;
-      map[a]!.pointsFor += g.scoreA;
-      map[a]!.pointsAgainst += g.scoreB;
-      map[b]!.pointsFor += g.scoreB;
-      map[b]!.pointsAgainst += g.scoreA;
-      if (g.status == 'final') {
-        if (g.scoreA > g.scoreB) {
-          map[a]!.wins++;
-          map[b]!.losses++;
-        } else if (g.scoreB > g.scoreA) {
-          map[b]!.wins++;
-          map[a]!.losses++;
-        }
-      }
-    }
-
-    final byPool = <String, List<_StandingRow>>{};
-    final pNames = {for (final p in pools) p.id: p.name};
-    for (final t in teams) {
-      final pid = t.poolId;
-      if (pid == null) continue;
-      final agg = map[t.id] ?? _Agg();
-      byPool.putIfAbsent(pid, () => []);
-      byPool[pid]!.add(_StandingRow(team: t, agg: agg));
-    }
-    byPool.updateAll((key, value) {
-      value.sort((a, b) => b.agg.points.compareTo(a.agg.points));
-      return value;
-    });
-
+    final ps = await repo.fetchPools(widget.tournament.id);
+    final ts = await repo.fetchTeams(widget.tournament.id);
     setState(() {
-      standingsByPool = byPool;
-      poolNames = pNames;
+      pools = ps;
+      teams = ts;
       loading = false;
     });
   }
@@ -795,40 +753,76 @@ class _StandingsTabState extends State<_StandingsTab> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const _PlaceholderCenter('Loading...');
-    if (standingsByPool.isEmpty) return const _PlaceholderCenter('No standings yet');
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        for (final entry in standingsByPool.entries) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: Text(poolNames[entry.key] ?? 'Pool', style: Theme.of(context).textTheme.titleMedium),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  for (var i = 0; i < entry.value.length; i++)
-                    Row(
-                      children: [
-                        SizedBox(width: 28, child: Text('${i + 1}')),
-                        Expanded(child: Text(entry.value[i].team.name)),
-                        SizedBox(width: 32, child: Text('${entry.value[i].agg.wins}')),
-                        const SizedBox(width: 12),
-                        SizedBox(width: 32, child: Text('${entry.value[i].agg.losses}')),
-                        const SizedBox(width: 12),
-                        SizedBox(width: 48, child: Text('${entry.value[i].agg.pointsFor}-${entry.value[i].agg.pointsAgainst}')),
-                        const SizedBox(width: 12),
-                        SizedBox(width: 32, child: Text('${entry.value[i].agg.points}')),
-                      ],
-                    ),
-                ],
+    return StreamBuilder<List<GameModel>>(
+      stream: repo.streamGames(widget.tournament.id),
+      builder: (context, snapshot) {
+        final games = snapshot.data ?? const <GameModel>[];
+        if (teams.isEmpty) return const _PlaceholderCenter('No standings yet');
+
+        final teamById = {for (final t in teams) t.id: t};
+        final map = <String, _Agg>{};
+        for (final g in games) {
+          final a = g.teamA; final b = g.teamB;
+          if (a == null || b == null) continue;
+          final pa = teamById[a]?.poolId; final pb = teamById[b]?.poolId;
+          if (pa == null || pb == null || pa != pb) continue;
+          map.putIfAbsent(a, () => _Agg()).played++;
+          map.putIfAbsent(b, () => _Agg()).played++;
+          map[a]!.pointsFor += g.scoreA; map[a]!.pointsAgainst += g.scoreB;
+          map[b]!.pointsFor += g.scoreB; map[b]!.pointsAgainst += g.scoreA;
+          if (g.status == 'final') {
+            if (g.scoreA > g.scoreB) { map[a]!.wins++; map[b]!.losses++; }
+            else if (g.scoreB > g.scoreA) { map[b]!.wins++; map[a]!.losses++; }
+          }
+        }
+
+        final byPool = <String, List<_StandingRow>>{};
+        for (final t in teams) {
+          final pid = t.poolId; if (pid == null) continue;
+          final agg = map[t.id] ?? _Agg();
+          byPool.putIfAbsent(pid, () => []);
+          byPool[pid]!.add(_StandingRow(team: t, agg: agg));
+        }
+        byPool.updateAll((key, value) {
+          value.sort((a, b) => b.agg.points.compareTo(a.agg.points));
+          return value;
+        });
+
+        return ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            for (final p in pools) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                child: Text(p.name, style: Theme.of(context).textTheme.titleMedium),
               ),
-            ),
-          ),
-        ],
-      ],
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < (byPool[p.id]?.length ?? 0); i++)
+                        Row(
+                          children: [
+                            SizedBox(width: 28, child: Text('${i + 1}')),
+                            Expanded(child: Text(byPool[p.id]![i].team.name)),
+                            SizedBox(width: 32, child: Text('${byPool[p.id]![i].agg.wins}')),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 32, child: Text('${byPool[p.id]![i].agg.losses}')),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 48, child: Text('${byPool[p.id]![i].agg.pointsFor}-${byPool[p.id]![i].agg.pointsAgainst}')),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 32, child: Text('${byPool[p.id]![i].agg.points}')),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ]
+          ],
+        );
+      },
     );
   }
 }
