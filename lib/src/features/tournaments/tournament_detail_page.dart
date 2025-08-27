@@ -422,7 +422,20 @@ class _PoolCardState extends State<_PoolCard> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: widget.teams.map((t) => Chip(label: Text(t.name))).toList(),
+                      children: [
+                        for (final t in widget.teams)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => TeamRosterPage(team: t)),
+                              );
+                            },
+                            onLongPress: () => _showTeamActions(context, t),
+                            child: Chip(
+                              label: Text(t.name),
+                            ),
+                          ),
+                      ],
                     ),
                   const SizedBox(height: 8),
                   Row(
@@ -532,6 +545,155 @@ class _SeedingListState extends State<_SeedingList> {
         ),
       ],
     );
+  }
+}
+
+extension on _PoolCardState {
+  Future<void> _showTeamActions(BuildContext context, Team team) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.groups),
+              title: const Text('Open roster'),
+              onTap: () => Navigator.pop(ctx, 'roster'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit team'),
+              onTap: () => Navigator.pop(ctx, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Move to another pool'),
+              onTap: () => Navigator.pop(ctx, 'move'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete team'),
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'roster':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => TeamRosterPage(team: team)));
+        break;
+      case 'edit':
+        await _editTeamDialog(team);
+        break;
+      case 'move':
+        await _moveTeamDialog(team);
+        break;
+      case 'delete':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete team?'),
+            content: Text('This will remove ${team.name} and its roster.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+            ],
+          ),
+        );
+        if (ok == true) {
+          final repo = TournamentRepo(Supabase.instance.client);
+          await repo.deleteTeam(team.id);
+          if (!mounted) return;
+          setState(() {
+            final list = widget.teams..removeWhere((x) => x.id == team.id);
+            // reflect in parent list
+            (context as Element).markNeedsBuild();
+          });
+        }
+        break;
+    }
+  }
+
+  Future<void> _editTeamDialog(Team team) async {
+    final nameCtrl = TextEditingController(text: team.name);
+    final captainCtrl = TextEditingController(text: team.captainName ?? '');
+    final emailCtrl = TextEditingController(text: team.captainEmail ?? '');
+    final phoneCtrl = TextEditingController(text: team.captainPhone ?? '');
+    final colorCtrl = TextEditingController(text: team.jerseyColor ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit team'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Team name')),
+              const SizedBox(height: 8),
+              TextField(controller: captainCtrl, decoration: const InputDecoration(labelText: 'Captain name')),
+              const SizedBox(height: 8),
+              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Captain email')),
+              const SizedBox(height: 8),
+              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Captain phone')),
+              const SizedBox(height: 8),
+              TextField(controller: colorCtrl, decoration: const InputDecoration(labelText: 'Jersey color')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final repo = TournamentRepo(Supabase.instance.client);
+      await repo.updateTeam(
+        team.id,
+        name: nameCtrl.text.trim(),
+        captainName: captainCtrl.text.trim().isEmpty ? null : captainCtrl.text.trim(),
+        captainEmail: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+        captainPhone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+        jerseyColor: colorCtrl.text.trim().isEmpty ? null : colorCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      (context as Element).markNeedsBuild();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Team updated')));
+    }
+  }
+
+  Future<void> _moveTeamDialog(Team team) async {
+    final repo = TournamentRepo(Supabase.instance.client);
+    // Fetch pools in this tournament
+    final pools = await repo.fetchPools(widget.tournament.id);
+    String? selected = team.poolId;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Move team to pool'),
+        content: DropdownButtonFormField<String>(
+          value: selected,
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Unassigned')),
+            for (final p in pools) DropdownMenuItem(value: p.id, child: Text(p.name)),
+          ],
+          onChanged: (v) => selected = v,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Move')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await repo.assignTeamToPool(team.id, selected);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Team moved')));
+    }
   }
 }
 

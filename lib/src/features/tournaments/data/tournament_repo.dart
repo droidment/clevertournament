@@ -70,6 +70,31 @@ class TournamentRepo {
     await _client.from('teams').update({'pool_id': poolId}).eq('id', teamId);
   }
 
+  Future<void> updateTeam(String teamId, {
+    String? name,
+    String? poolId,
+    int? seed,
+    String? captainName,
+    String? captainEmail,
+    String? captainPhone,
+    String? jerseyColor,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (name != null) payload['name'] = name;
+    if (poolId != null) payload['pool_id'] = poolId;
+    if (seed != null) payload['seed'] = seed;
+    if (captainName != null) payload['captain_name'] = captainName;
+    if (captainEmail != null) payload['captain_email'] = captainEmail;
+    if (captainPhone != null) payload['captain_phone'] = captainPhone;
+    if (jerseyColor != null) payload['jersey_color'] = jerseyColor;
+    if (payload.isEmpty) return;
+    await _client.from('teams').update(payload).eq('id', teamId);
+  }
+
+  Future<void> deleteTeam(String teamId) async {
+    await _client.from('teams').delete().eq('id', teamId);
+  }
+
   Future<void> setSeeds(List<Team> teams) async {
     // Update seed to list order index (0-based)
     for (var i = 0; i < teams.length; i++) {

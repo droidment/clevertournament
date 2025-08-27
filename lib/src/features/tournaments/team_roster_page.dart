@@ -61,6 +61,86 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
     }
   }
 
+  Future<void> _edit(Player player) async {
+    final nameCtrl = TextEditingController(text: player.name);
+    final numberCtrl = TextEditingController(text: player.number?.toString() ?? '');
+    final emailCtrl = TextEditingController(text: player.email ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit player'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+            const SizedBox(height: 8),
+            TextField(controller: numberCtrl, decoration: const InputDecoration(labelText: 'Number'), keyboardType: TextInputType.number),
+            const SizedBox(height: 8),
+            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      // No separate update endpoint for player fields, so delete + add replacement or add update if needed later.
+      await repo.removePlayer(player.id);
+      final numVal = int.tryParse(numberCtrl.text);
+      final p = await repo.addPlayer(widget.team.id, name: nameCtrl.text.trim(), number: numVal, email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim());
+      setState(() {
+        final idx = players.indexWhere((x) => x.id == player.id);
+        if (idx >= 0) {
+          players[idx] = p;
+        }
+      });
+    }
+  }
+
+  Future<void> _import() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bulk add players'),
+        content: SizedBox(
+          width: 480,
+          child: TextField(
+            controller: ctrl,
+            maxLines: 10,
+            decoration: const InputDecoration(
+              labelText: 'Paste names, one per line (optionally "#number Name" or "Name, number")',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final lines = ctrl.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty);
+      for (final line in lines) {
+        int? number;
+        String name = line;
+        final m1 = RegExp(r'^#?(\d+)\s+(.*)$').firstMatch(line);
+        final m2 = RegExp(r'^(.*?)[,\s]+(\d+)$').firstMatch(line);
+        if (m1 != null) {
+          number = int.tryParse(m1.group(1)!);
+          name = m1.group(2)!.trim();
+        } else if (m2 != null) {
+          name = m2.group(1)!.trim();
+          number = int.tryParse(m2.group(2)!);
+        }
+        final p = await repo.addPlayer(widget.team.id, name: name, number: number);
+        setState(() { players = [...players, p]; });
+      }
+    }
+  }
+
   Future<void> _remove(Player p) async {
     await repo.removePlayer(p.id);
     setState(() { players.removeWhere((x) => x.id == p.id); });
@@ -81,14 +161,26 @@ class _TeamRosterPageState extends State<TeamRosterPage> {
                     child: ListTile(
                       title: Text(p.name),
                       subtitle: Text([if (p.number != null) '#${p.number}', if (p.email != null) p.email].where((e) => e != null && e.toString().isNotEmpty).join(' • ')),
-                      trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _remove(p)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(p)),
+                          IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _remove(p)),
+                        ],
+                      ),
                     ),
                   ),
                 const SizedBox(height: 80),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.person_add_alt_1), label: const Text('Add player')),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.person_add_alt_1), label: const Text('Add player')),
+          const SizedBox(height: 8),
+          FloatingActionButton.extended(onPressed: _import, icon: const Icon(Icons.upload_file), label: const Text('Import list')),
+        ],
+      ),
     );
   }
 }
-
