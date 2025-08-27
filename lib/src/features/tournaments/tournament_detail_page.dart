@@ -579,7 +579,6 @@ class _ScheduleTab extends StatefulWidget {
 
 class _ScheduleTabState extends State<_ScheduleTab> {
   late final TournamentRepo repo;
-  List<GameModel> games = [];
   Map<String, Team> teamById = {};
   bool loading = true;
 
@@ -587,17 +586,14 @@ class _ScheduleTabState extends State<_ScheduleTab> {
   void initState() {
     super.initState();
     repo = TournamentRepo(Supabase.instance.client);
-    _load();
+    _loadTeams();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadTeams() async {
     setState(() => loading = true);
     final ts = await repo.fetchTeams(widget.tournament.id);
-    final map = {for (final t in ts) t.id: t};
-    final gs = await repo.fetchGames(widget.tournament.id);
     setState(() {
-      teamById = map;
-      games = gs;
+      teamById = {for (final t in ts) t.id: t};
       loading = false;
     });
   }
@@ -624,7 +620,6 @@ class _ScheduleTabState extends State<_ScheduleTab> {
       final a = int.tryParse(aCtrl.text) ?? 0;
       final b = int.tryParse(bCtrl.text) ?? 0;
       await repo.updateScore(g.id, a: a, b: b);
-      _load();
     }
   }
 
@@ -684,36 +679,40 @@ class _ScheduleTabState extends State<_ScheduleTab> {
     );
     if (ok == true) {
       await repo.updateGame(g.id, court: selectedCourt, startTime: selectedTime);
-      _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) return const _PlaceholderCenter('Loading...');
-    if (games.isEmpty) return const _PlaceholderCenter('No games scheduled');
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: games.length,
-      itemBuilder: (ctx, i) {
-        final g = games[i];
-        final a = teamById[g.teamA ?? ''];
-        final b = teamById[g.teamB ?? ''];
-        final title = '${a?.name ?? 'TBD'} vs ${b?.name ?? 'TBD'}';
-        final sub = 'Status: ${g.status}';
-        return Card(
-          child: ListTile(
-            title: Text(title),
-            subtitle: Text(sub),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${g.scoreA} - ${g.scoreB}')
-              ],
-            ),
-            onTap: () => _enterScore(g),
-            onLongPress: () => _editGame(g),
-          ),
+    return StreamBuilder<List<GameModel>>(
+      stream: repo.streamGames(widget.tournament.id),
+      builder: (context, snapshot) {
+        final games = snapshot.data ?? const <GameModel>[];
+        if (games.isEmpty) return const _PlaceholderCenter('No games scheduled');
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: games.length,
+          itemBuilder: (ctx, i) {
+            final g = games[i];
+            final a = teamById[g.teamA ?? ''];
+            final b = teamById[g.teamB ?? ''];
+            final title = '${a?.name ?? 'TBD'} vs ${b?.name ?? 'TBD'}';
+            final details = <String>[
+              if (g.court != null && g.court!.isNotEmpty) 'Court: ${g.court}',
+              if (g.startTime != null) 'Start: ${g.startTime}',
+              'Status: ${g.status}',
+            ].join(' • ');
+            return Card(
+              child: ListTile(
+                title: Text(title),
+                subtitle: Text(details),
+                trailing: Text('${g.scoreA} - ${g.scoreB}'),
+                onTap: () => _enterScore(g),
+                onLongPress: () => _editGame(g),
+              ),
+            );
+          },
         );
       },
     );

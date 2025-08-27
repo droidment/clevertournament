@@ -111,6 +111,19 @@ class TournamentRepo {
     await _client.from('games').update(payload).eq('id', gameId);
   }
 
+  Stream<List<GameModel>> streamGames(String tournamentId, {String? poolId}) {
+    var q = _client
+        .from('games')
+        .stream(primaryKey: ['id'])
+        .eq('tournament_id', tournamentId);
+    if (poolId != null) {
+      q = q.eq('pool_id', poolId);
+    }
+    return q.order('start_time').map(
+          (rows) => rows.map((e) => GameModel.fromMap(e)).toList(),
+        );
+  }
+
   // Announcements
   Future<List<Announcement>> fetchAnnouncements(String tournamentId) async {
     final res = await _client
